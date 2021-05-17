@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"math/big"
 	"net/http"
 	"yam-api/source/config"
 	"yam-api/source/utils"
@@ -13,42 +12,8 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
 	"github.com/go-playground/validator"
+	"github.com/robfig/cron"
 )
-
-type Assets struct {
-	Ugas    []AssetInstance
-	Ustonks []AssetInstance
-}
-type Asset struct {
-	AssetName     string
-	AssetInstance AssetInstance
-	AssetPrice    *big.Float
-}
-type AssetInstance struct {
-	Name       string
-	Cycle      string
-	Year       string
-	Collateral string
-	Token      Token
-	Emp        Emp
-	Pool       Pool
-	Apr        AprData
-}
-type Emp struct {
-	Address string
-	New     bool
-}
-type Pool struct {
-	Address string
-}
-type AprData struct {
-	Force int
-	Extra int
-}
-type Token struct {
-	Address  string
-	Decimals int
-}
 
 var validate *validator.Validate
 
@@ -61,7 +26,27 @@ func Initialize(conf *config.Config, geth *ethclient.Client) chi.Router {
 		AllowCredentials: true,
 		MaxAge:           300,
 	})
+	/////////  DB connect  ////////////
 	mongodb.Connect()
+	/////////  Creating getAprYamCron  ////////////
+	if getAprYamCron == nil {
+		getAprYamCron := cron.New()
+		getAprYamCron.AddFunc("@every 2m", func() {
+			val := calculateAprYam(geth)
+			storeAprYam(val)
+		})
+		getAprYamCron.Start()
+	}
+	/////////  Creating getAprDegenerativeCron  ////////////
+	if getAprDegenerativeCron == nil {
+		getAprDegenerativeCron := cron.New()
+		getAprDegenerativeCron.AddFunc("@every 2m", func() {
+			response := CalculateAprDegenerative(geth)
+			storeAprDegenerative(response.UGAS)
+		})
+		getAprDegenerativeCron.Start()
+	}
+
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 	router.Use(cors.Handler)
@@ -74,7 +59,7 @@ func Initialize(conf *config.Config, geth *ethclient.Client) chi.Router {
 
 	// YAM
 	Treasury("/treasury", router, conf, geth)
-
+	//APR
 	Apr("/apr", router, conf, geth)
 	AprYam("/apr/yam", router, conf, geth)
 	AprDegenerative("/apr/degenerative", router, conf, geth)

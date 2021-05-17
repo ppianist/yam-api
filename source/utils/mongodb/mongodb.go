@@ -9,7 +9,6 @@ import (
 
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -17,22 +16,12 @@ import (
 
 var client *mongo.Client
 
-type AprYam struct {
-	ID    primitive.ObjectID `bson:"_id"`
-	Value float64            `bson:"apryam"`
-}
-type AprDegenerative struct {
-	ID    primitive.ObjectID `bson:"_id"`
-	Value map[string]float64 `bson:"aprdegenerative"`
-}
-
 func Connect() {
 	var err error
 	err = godotenv.Load(".env")
 	if err != nil {
 		log.Fatalf("Error loading .env file")
 	}
-
 	dbUser := os.Getenv("DB_USER")
 	dbPass := os.Getenv("DB_PASS")
 	dbName := os.Getenv("DB_NAME")

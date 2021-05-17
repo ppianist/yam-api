@@ -29,20 +29,6 @@ import (
 	"github.com/robfig/cron"
 )
 
-type EmpInfo struct {
-	Address           string
-	CollateralAddress string
-	Size              big.Int
-	Price             big.Float
-	Decimals          int
-}
-type responseAprDegenerative struct {
-	UGAS map[string]float64 `json:"UGAS"`
-}
-type responseAprYam struct {
-	Value float64 `json:"farm"`
-}
-
 var rewards map[string]*big.Float
 var eth_rebaserContract *eth_rebaser.EthRebaser
 var yamv3Contract *yamv3.Yamv3
@@ -55,15 +41,13 @@ func Apr(path string, router chi.Router, conf *config.Config, geth *ethclient.Cl
 		rewards = make(map[string]*big.Float)
 		//Open assetsJson File
 		assetsFile, err := os.Open("assets.json")
-
 		if err != nil {
 			log.Fatalf("failed to get jasonfile: %v", err)
 		}
-
 		fmt.Println("Successfully Opened assets.json")
-
 		//defer the closing of our jsonFile so that we can parse it later on
 		defer assetsFile.Close()
+
 		byteValue, _ := ioutil.ReadAll(assetsFile)
 		var assets Assets
 		json.Unmarshal([]byte(byteValue), &assets)
@@ -106,35 +90,21 @@ func Apr(path string, router chi.Router, conf *config.Config, geth *ethclient.Cl
 	})
 }
 func storeAprYam(val float64) {
-
 	mongodb.InsertAprYam(val)
-	//	mongodb.
 }
 func storeAprDegenerative(val map[string]float64) {
-
 	mongodb.InsertAprDegenerative(val)
-	//	mongodb.
 }
 func AprYam(path string, router chi.Router, conf *config.Config, geth *ethclient.Client) {
 	router.Get(path, func(w http.ResponseWriter, r *http.Request) {
 
-		if getAprYamCron == nil {
-			getAprYamCron := cron.New()
-			getAprYamCron.AddFunc("@every 20s", func() {
-				val := calculateAprYam(geth)
-				storeAprYam(val)
-			})
-			getAprYamCron.Start()
-		}
 		val := mongodb.GetAprYam()
 		if val == 0 {
 			val = calculateAprYam(geth)
 			storeAprYam(val)
 		}
-
 		response := &responseAprYam{
 			Value: val}
-
 		utils.ResJSON(http.StatusCreated, w,
 			response,
 		)
@@ -175,17 +145,9 @@ func getScalingFactor(geth *ethclient.Client) *big.Int {
 }
 func AprDegenerative(path string, router chi.Router, conf *config.Config, geth *ethclient.Client) {
 	router.Get(path, func(w http.ResponseWriter, r *http.Request) {
-		if getAprDegenerativeCron == nil {
-			getAprDegenerativeCron := cron.New()
-			getAprDegenerativeCron.AddFunc("@every 2m", func() {
-				response := CalculateAprDegenerative(geth)
-				storeAprDegenerative(response.UGAS)
-			})
-			getAprDegenerativeCron.Start()
-		}
+
 		val := mongodb.GetAprDegenerative()
 		if val == nil {
-			fmt.Println("asdf")
 			val = CalculateAprDegenerative(geth).UGAS
 			storeAprDegenerative(val)
 		}
@@ -226,7 +188,6 @@ func CalculateAprDegenerative(geth *ethclient.Client) *responseAprDegenerative {
 		empInfo := GetEmpInfo(empAddr, "usd", geth)
 		allEmpInfo = append(allEmpInfo, empInfo)
 	}
-	fmt.Println("asdfa")
 	var totalValue = big.NewFloat(0)
 
 	var values []big.Float
@@ -356,14 +317,12 @@ func CalculateApr(payload Asset, geth *ethclient.Client) *big.Float {
 	aprCalculateExtra := new(big.Float).Quo(new(big.Float).Mul(weekRewards, big.NewFloat(52*100)), assetReserveValue)
 	totalAprCalculation := new(big.Float).Add(aprCalculate, aprCalculateExtra)
 	return totalAprCalculation
-
 }
 func CalculateEmpValue(price big.Float, size *big.Int, decimals int) *big.Float {
 	fixedPrice := price
 	fixedSize := utils.BnToDec(size, decimals)
 	ret := new(big.Float).Mul(&fixedPrice, fixedSize)
 	return ret
-
 }
 func GetUniPrice(tokenA string, tokenB string, geth *ethclient.Client) *big.Float {
 	uniFact := GetUNIFact(geth)
